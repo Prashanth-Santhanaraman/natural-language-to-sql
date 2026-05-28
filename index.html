@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NLP → SQL · Premier League Query Engine</title>
+    <meta
+      name="description"
+      content="Ask natural language questions about Premier League data and get instant SQL-powered answers using Gemini AI."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ── Reset & Base ── */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --bg:         #080c14;
+        --surface:    #0e1420;
+        --surface2:   #141b2a;
+        --surface3:   #1a2236;
+        --border:     rgba(255,255,255,.07);
+        --border2:    rgba(255,255,255,.12);
+        --accent:     #6c63ff;
+        --accent2:    #a78bfa;
+        --accent3:    #38bdf8;
+        --green:      #34d399;
+        --amber:      #fbbf24;
+        --red:        #f87171;
+        --text:       #e2e8f0;
+        --text2:      #94a3b8;
+        --text3:      #475569;
+        --radius:     14px;
+        --radius-sm:  8px;
+        --shadow:     0 20px 60px rgba(0,0,0,.6);
+      }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        font-family: 'Inter', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* ── Animated Background ── */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(ellipse 80% 50% at 20% -10%, rgba(108,99,255,.18) 0%, transparent 60%),
+          radial-gradient(ellipse 60% 40% at 80% 100%, rgba(56,189,248,.12) 0%, transparent 55%);
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ── Scrollbar ── */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: var(--surface); }
+      ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+      /* ── Layout ── */
+      .wrapper {
+        position: relative;
+        z-index: 1;
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 40px 20px 80px;
+      }
+
+      /* ── Header ── */
+      header {
+        text-align: center;
+        margin-bottom: 52px;
+        animation: fadeDown .6s ease both;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(108,99,255,.15);
+        border: 1px solid rgba(108,99,255,.35);
+        color: var(--accent2);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        padding: 5px 14px;
+        border-radius: 100px;
+        margin-bottom: 20px;
+      }
+
+      .badge-dot {
+        width: 6px; height: 6px;
+        background: var(--green);
+        border-radius: 50%;
+        box-shadow: 0 0 8px var(--green);
+        animation: pulse 2s ease infinite;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 5vw, 3.4rem);
+        font-weight: 800;
+        line-height: 1.15;
+        letter-spacing: -.02em;
+        background: linear-gradient(135deg, #fff 30%, var(--accent2) 70%, var(--accent3));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 14px;
+      }
+
+      .subtitle {
+        color: var(--text2);
+        font-size: 1rem;
+        font-weight: 400;
+        max-width: 480px;
+        margin: 0 auto;
+        line-height: 1.6;
+      }
+
+      /* ── Query Card ── */
+      .query-card {
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        padding: 28px;
+        box-shadow: var(--shadow);
+        animation: fadeUp .65s ease .1s both;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .query-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
+      }
+
+      .query-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: .8rem;
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--text2);
+        margin-bottom: 14px;
+      }
+
+      .query-label svg { color: var(--accent2); }
+
+      .input-row {
+        display: flex;
+        gap: 12px;
+      }
+
+      #questionInput {
+        flex: 1;
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius-sm);
+        color: var(--text);
+        font-family: 'Inter', sans-serif;
+        font-size: .95rem;
+        padding: 14px 18px;
+        outline: none;
+        transition: border-color .2s, box-shadow .2s;
+        resize: none;
+        min-height: 52px;
+        max-height: 120px;
+        line-height: 1.5;
+      }
+
+      #questionInput::placeholder { color: var(--text3); }
+
+      #questionInput:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(108,99,255,.2);
+      }
+
+      #askBtn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: linear-gradient(135deg, var(--accent), #8b5cf6);
+        color: #fff;
+        font-family: 'Inter', sans-serif;
+        font-size: .9rem;
+        font-weight: 600;
+        border: none;
+        border-radius: var(--radius-sm);
+        padding: 14px 22px;
+        cursor: pointer;
+        white-space: nowrap;
+        align-self: flex-end;
+        transition: transform .15s, box-shadow .15s, opacity .15s;
+        box-shadow: 0 4px 20px rgba(108,99,255,.45);
+      }
+
+      #askBtn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 28px rgba(108,99,255,.55);
+      }
+
+      #askBtn:active:not(:disabled) { transform: translateY(0); }
+
+      #askBtn:disabled { opacity: .55; cursor: not-allowed; }
+
+      /* ── Suggestion Pills ── */
+      .suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .pill {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--text2);
+        font-size: .78rem;
+        padding: 5px 12px;
+        border-radius: 100px;
+        cursor: pointer;
+        transition: all .2s;
+        user-select: none;
+      }
+
+      .pill:hover {
+        border-color: var(--accent);
+        color: var(--accent2);
+        background: rgba(108,99,255,.1);
+      }
+
+      /* ── Loading ── */
+      #loadingSection {
+        display: none;
+        justify-content: center;
+        align-items: center;
+        gap: 14px;
+        padding: 40px;
+        animation: fadeUp .4s ease both;
+      }
+
+      .spinner {
+        width: 32px; height: 32px;
+        border: 3px solid rgba(108,99,255,.2);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+      }
+
+      .loading-text { color: var(--text2); font-size: .9rem; }
+
+      /* ── Results Area ── */
+      #resultsSection {
+        display: none;
+        flex-direction: column;
+        gap: 20px;
+        animation: fadeUp .5s ease both;
+        margin-top: 24px;
+      }
+
+      /* ── SQL Block ── */
+      .sql-block {
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0,0,0,.3);
+      }
+
+      .sql-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 18px;
+        background: var(--surface2);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .sql-header-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: .8rem;
+        font-weight: 600;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+        color: var(--text2);
+      }
+
+      .dot-red   { width:11px;height:11px;background:#ff5f57;border-radius:50%; }
+      .dot-amber { width:11px;height:11px;background:#febc2e;border-radius:50%; }
+      .dot-green { width:11px;height:11px;background:#28c840;border-radius:50%; }
+      .traffic-lights { display:flex;gap:6px; }
+
+      #copyBtn {
+        background: transparent;
+        border: 1px solid var(--border2);
+        color: var(--text2);
+        font-size: .75rem;
+        font-family: 'Inter', sans-serif;
+        padding: 4px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all .2s;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      #copyBtn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+      #sqlOutput {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: .85rem;
+        color: #c9d1d9;
+        padding: 20px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.7;
+        tab-size: 2;
+      }
+
+      /* SQL syntax highlight */
+      .kw   { color: #ff79c6; font-weight: 600; }
+      .fn   { color: #50fa7b; }
+      .str  { color: #f1fa8c; }
+      .num  { color: #bd93f9; }
+      .op   { color: #ff79c6; }
+
+      /* ── Stats Row ── */
+      .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 14px;
+      }
+
+      .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 16px 18px;
+        text-align: center;
+        transition: border-color .2s;
+      }
+
+      .stat-card:hover { border-color: var(--border2); }
+
+      .stat-value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--accent2), var(--accent3));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .stat-label {
+        font-size: .72rem;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        margin-top: 3px;
+      }
+
+      /* ── Table Wrapper ── */
+      .table-card {
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0,0,0,.3);
+      }
+
+      .table-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        background: var(--surface2);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .table-title {
+        font-size: .82rem;
+        font-weight: 600;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+        color: var(--text2);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .row-count {
+        background: rgba(108,99,255,.2);
+        color: var(--accent2);
+        font-size: .72rem;
+        font-weight: 700;
+        padding: 2px 9px;
+        border-radius: 100px;
+      }
+
+      #searchInput {
+        background: var(--surface3);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: 'Inter', sans-serif;
+        font-size: .8rem;
+        padding: 6px 12px;
+        outline: none;
+        transition: border-color .2s;
+        width: 180px;
+      }
+
+      #searchInput::placeholder { color: var(--text3); }
+      #searchInput:focus { border-color: var(--accent); }
+
+      .table-scroll { overflow-x: auto; }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: .84rem;
+      }
+
+      thead th {
+        background: var(--surface2);
+        padding: 11px 16px;
+        text-align: left;
+        font-size: .72rem;
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--text2);
+        border-bottom: 1px solid var(--border2);
+        white-space: nowrap;
+        user-select: none;
+        cursor: pointer;
+        transition: color .2s;
+        position: relative;
+      }
+
+      thead th:hover { color: var(--accent2); }
+
+      thead th .sort-icon {
+        margin-left: 5px;
+        opacity: .4;
+        font-size: .65rem;
+        vertical-align: middle;
+        transition: opacity .2s;
+      }
+
+      thead th:hover .sort-icon { opacity: .8; }
+      thead th.sorted .sort-icon { opacity: 1; color: var(--accent2); }
+
+      tbody tr {
+        border-bottom: 1px solid var(--border);
+        transition: background .15s;
+      }
+
+      tbody tr:last-child { border-bottom: none; }
+
+      tbody tr:hover { background: rgba(108,99,255,.06); }
+
+      tbody td {
+        padding: 10px 16px;
+        color: var(--text);
+        white-space: nowrap;
+      }
+
+      .null-val { color: var(--text3); font-style: italic; font-size: .8rem; }
+
+      .num-val { color: var(--accent2); font-family: 'JetBrains Mono', monospace; font-size: .82rem; }
+
+      /* ── No Results ── */
+      .empty-state {
+        text-align: center;
+        padding: 50px 20px;
+        color: var(--text3);
+      }
+
+      .empty-state svg { margin-bottom: 12px; opacity: .4; }
+      .empty-state p { font-size: .9rem; }
+
+      /* ── Error ── */
+      #errorSection {
+        display: none;
+        background: rgba(248,113,113,.08);
+        border: 1px solid rgba(248,113,113,.3);
+        border-radius: var(--radius);
+        padding: 20px 24px;
+        animation: fadeUp .4s ease both;
+        margin-top: 24px;
+      }
+
+      .error-title {
+        font-size: .85rem;
+        font-weight: 600;
+        color: var(--red);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .error-body {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: .8rem;
+        color: rgba(248,113,113,.8);
+        line-height: 1.6;
+      }
+
+      /* ── History ── */
+      #historySection {
+        margin-top: 40px;
+        animation: fadeUp .7s ease .2s both;
+      }
+
+      .section-heading {
+        font-size: .78rem;
+        font-weight: 600;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+        color: var(--text3);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .history-item {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 12px 16px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        transition: all .2s;
+      }
+
+      .history-item:hover {
+        border-color: var(--border2);
+        background: var(--surface2);
+      }
+
+      .history-q {
+        font-size: .85rem;
+        color: var(--text);
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .history-meta {
+        font-size: .72rem;
+        color: var(--text3);
+        white-space: nowrap;
+      }
+
+      /* ── Animations ── */
+      @keyframes fadeDown {
+        from { opacity: 0; transform: translateY(-20px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: .4; }
+      }
+
+      @keyframes shimmer {
+        0%   { background-position: -200% center; }
+        100% { background-position:  200% center; }
+      }
+
+      /* ── Responsive ── */
+      @media (max-width: 600px) {
+        .input-row { flex-direction: column; }
+        #askBtn { width: 100%; justify-content: center; }
+        .stats-row { grid-template-columns: 1fr 1fr; }
+        #searchInput { width: 120px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+
+      <!-- Header -->
+      <header>
+        <div class="badge">
+          <span class="badge-dot"></span>
+          Premier League · AI Query Engine
+        </div>
+        <h1>Ask Your Database<br>in Plain English</h1>
+        <p class="subtitle">
+          Powered by Gemini AI — type any question, get instant SQL results from the Premier League (2000 - 2025) database.
+        </p>
+      </header>
+
+      <!-- Query Card -->
+      <div class="query-card">
+        <div class="query-label">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          Natural Language Query
+        </div>
+
+        <div class="input-row">
+          <textarea
+            id="questionInput"
+            placeholder="e.g. Who scored the most goals last season?"
+            rows="1"
+            autocomplete="off"
+            spellcheck="false"
+          ></textarea>
+          <button id="askBtn" onclick="askQuestion()">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Run Query
+          </button>
+        </div>
+
+        <!-- Suggestion pills -->
+        <div class="suggestions" id="suggestionPills">
+          <span class="pill" onclick="useSuggestion(this)">Top 10 goal scorers</span>
+          <span class="pill" onclick="useSuggestion(this)">Which team won the most matches?</span>
+          <span class="pill" onclick="useSuggestion(this)">Show all players from Arsenal</span>
+          <span class="pill" onclick="useSuggestion(this)">Most assists this season</span>
+          <span class="pill" onclick="useSuggestion(this)">Average goals per match by team</span>
+          <span class="pill" onclick="useSuggestion(this)">List all teams in the database</span>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div id="loadingSection" style="display:none; margin-top:24px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px;">
+          <div class="spinner"></div>
+          <span class="loading-text">Thinking with Gemini AI…</span>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="errorSection">
+        <div class="error-title">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Query Error
+        </div>
+        <div class="error-body" id="errorBody"></div>
+      </div>
+
+      <!-- Results -->
+      <div id="resultsSection">
+
+        <!-- Stats -->
+        <div class="stats-row" id="statsRow">
+          <div class="stat-card">
+            <div class="stat-value" id="statRows">—</div>
+            <div class="stat-label">Rows Returned</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statCols">—</div>
+            <div class="stat-label">Columns</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statTime">—</div>
+            <div class="stat-label">Response Time</div>
+          </div>
+        </div>
+
+        <!-- SQL Block -->
+        <div class="sql-block">
+          <div class="sql-header">
+            <div class="sql-header-left">
+              <div class="traffic-lights">
+                <div class="dot-red"></div>
+                <div class="dot-amber"></div>
+                <div class="dot-green"></div>
+              </div>
+              Generated SQL
+            </div>
+            <button id="copyBtn" onclick="copySQL()">
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+              Copy
+            </button>
+          </div>
+          <div id="sqlOutput"></div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M3 6h18M3 18h18"/>
+              </svg>
+              Results
+              <span class="row-count" id="rowCount">0 rows</span>
+            </div>
+            <input id="searchInput" type="text" placeholder="🔍 Filter results…" oninput="filterTable()" />
+          </div>
+          <div class="table-scroll">
+            <table id="resultTable">
+              <thead id="tableHead"></thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- History -->
+      <div id="historySection" style="display:none;">
+        <div class="section-heading">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 0 .5-4.5"/>
+          </svg>
+          Recent Queries
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+
+    </div><!-- /wrapper -->
+
+    <script>
+      /* ── State ── */
+      let currentSQL = '';
+      let allRows = [];
+      let allCols = [];
+      let sortCol = -1;
+      let sortAsc = true;
+      const history = [];
+
+      /* ── Auto-resize textarea ── */
+      const ta = document.getElementById('questionInput');
+      ta.addEventListener('input', () => {
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+      });
+      ta.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askQuestion(); }
+      });
+
+      /* ── Suggestion pills ── */
+      function useSuggestion(el) {
+        ta.value = el.textContent;
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+        ta.focus();
+      }
+
+      /* ── Main ask function ── */
+      async function askQuestion() {
+        const question = ta.value.trim();
+        if (!question) { ta.focus(); return; }
+
+        const btn = document.getElementById('askBtn');
+        btn.disabled = true;
+
+        hideAll();
+        show('loadingSection');
+
+        const start = Date.now();
+
+        try {
+          const res = await fetch('http://localhost:3000/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question })
+          });
+
+          const data = await res.json();
+          const elapsed = ((Date.now() - start) / 1000).toFixed(2) + 's';
+
+          hide('loadingSection');
+
+          if (!res.ok) {
+            showError(data.error || 'Unknown error', data.details || data.sql || '');
+          } else {
+            renderResults(data, elapsed);
+            addHistory(question);
+          }
+        } catch (err) {
+          hide('loadingSection');
+          showError('Network Error', err.message);
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
+      /* ── Render Results ── */
+      function renderResults(data, elapsed) {
+        currentSQL = data.sql || '';
+        const rows = data.result || [];
+        const cols = rows.length > 0 ? Object.keys(rows[0]) : [];
+
+        allRows = rows;
+        allCols = cols;
+        sortCol = -1;
+        sortAsc = true;
+
+        // Stats
+        document.getElementById('statRows').textContent = rows.length;
+        document.getElementById('statCols').textContent = cols.length;
+        document.getElementById('statTime').textContent = elapsed;
+        document.getElementById('rowCount').textContent = rows.length + ' row' + (rows.length !== 1 ? 's' : '');
+
+        // SQL
+        document.getElementById('sqlOutput').innerHTML = highlightSQL(currentSQL);
+
+        // Table
+        renderTable(rows, cols);
+
+        show('resultsSection');
+      }
+
+      /* ── Render Table ── */
+      function renderTable(rows, cols) {
+        const thead = document.getElementById('tableHead');
+        const tbody = document.getElementById('tableBody');
+
+        if (cols.length === 0) {
+          thead.innerHTML = '';
+          tbody.innerHTML = `
+            <tr><td colspan="1">
+              <div class="empty-state">
+                <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p>No results found</p>
+              </div>
+            </td></tr>`;
+          return;
+        }
+
+        // Header
+        thead.innerHTML = '<tr>' + cols.map((col, i) => `
+          <th onclick="sortBy(${i})" class="${sortCol === i ? 'sorted' : ''}">
+            ${escHtml(col)}
+            <span class="sort-icon">${sortCol === i ? (sortAsc ? '▲' : '▼') : '⇅'}</span>
+          </th>`).join('') + '</tr>';
+
+        // Body
+        tbody.innerHTML = rows.map(row => '<tr>' + cols.map(col => {
+          const val = row[col];
+          if (val === null || val === undefined) return `<td><span class="null-val">null</span></td>`;
+          if (typeof val === 'number') return `<td><span class="num-val">${val}</span></td>`;
+          return `<td>${escHtml(String(val))}</td>`;
+        }).join('') + '</tr>').join('');
+      }
+
+      /* ── Sort ── */
+      function sortBy(colIdx) {
+        if (sortCol === colIdx) sortAsc = !sortAsc;
+        else { sortCol = colIdx; sortAsc = true; }
+
+        const col = allCols[colIdx];
+        const sorted = [...allRows].sort((a, b) => {
+          const av = a[col], bv = b[col];
+          if (av === null) return 1;
+          if (bv === null) return -1;
+          if (typeof av === 'number' && typeof bv === 'number') return sortAsc ? av - bv : bv - av;
+          return sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+        });
+
+        renderTable(sorted, allCols);
+      }
+
+      /* ── Filter ── */
+      function filterTable() {
+        const q = document.getElementById('searchInput').value.toLowerCase();
+        const filtered = allRows.filter(row =>
+          allCols.some(col => String(row[col] ?? '').toLowerCase().includes(q))
+        );
+        renderTable(filtered, allCols);
+        document.getElementById('rowCount').textContent =
+          filtered.length + ' row' + (filtered.length !== 1 ? 's' : '') + (q ? ' (filtered)' : '');
+      }
+
+      /* ── SQL Syntax Highlighting ── */
+      function highlightSQL(sql) {
+        const keywords = ['SELECT','FROM','WHERE','JOIN','LEFT','RIGHT','INNER','OUTER','ON','GROUP BY','ORDER BY','HAVING','LIMIT','OFFSET','AS','AND','OR','NOT','IN','LIKE','IS','NULL','DISTINCT','COUNT','SUM','AVG','MIN','MAX','BY','ASC','DESC','BETWEEN','EXISTS','UNION','ALL','TOP'];
+        let out = escHtml(sql);
+        keywords.forEach(kw => {
+          const re = new RegExp(`\\b(${kw})\\b`, 'gi');
+          out = out.replace(re, `<span class="kw">$1</span>`);
+        });
+        // strings
+        out = out.replace(/&#39;([^&#]*)&#39;/g, `<span class="str">'$1'</span>`);
+        out = out.replace(/&quot;([^&]*)&quot;/g, `<span class="str">"$1"</span>`);
+        // numbers
+        out = out.replace(/\b(\d+)\b/g, `<span class="num">$1</span>`);
+        return out;
+      }
+
+      /* ── Copy SQL ── */
+      async function copySQL() {
+        if (!currentSQL) return;
+        await navigator.clipboard.writeText(currentSQL);
+        const btn = document.getElementById('copyBtn');
+        btn.innerHTML = '✓ Copied!';
+        btn.style.color = 'var(--green)';
+        btn.style.borderColor = 'var(--green)';
+        setTimeout(() => {
+          btn.innerHTML = `<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy`;
+          btn.style.color = '';
+          btn.style.borderColor = '';
+        }, 2000);
+      }
+
+      /* ── History ── */
+      function addHistory(question) {
+        history.unshift({ question, time: new Date().toLocaleTimeString() });
+        if (history.length > 10) history.pop();
+        renderHistory();
+      }
+
+      function renderHistory() {
+        const section = document.getElementById('historySection');
+        const list = document.getElementById('historyList');
+        if (history.length === 0) { section.style.display = 'none'; return; }
+        section.style.display = 'block';
+        list.innerHTML = history.map((h, i) => `
+          <div class="history-item" onclick="rerunHistory(${i})">
+            <span class="history-q">${escHtml(h.question)}</span>
+            <span class="history-meta">${h.time}</span>
+          </div>`).join('');
+      }
+
+      function rerunHistory(i) {
+        ta.value = history[i].question;
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+        askQuestion();
+      }
+
+      /* ── Helpers ── */
+      function show(id) { document.getElementById(id).style.display = id === 'resultsSection' ? 'flex' : 'block'; }
+      function hide(id) { document.getElementById(id).style.display = 'none'; }
+
+      function hideAll() {
+        ['loadingSection', 'resultsSection', 'errorSection'].forEach(hide);
+        document.getElementById('searchInput').value = '';
+      }
+
+      function showError(title, body) {
+        document.getElementById('errorBody').textContent = body || title;
+        show('errorSection');
+      }
+
+      function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+      }
+    </script>
+  </body>
+</html>
