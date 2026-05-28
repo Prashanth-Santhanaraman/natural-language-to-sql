@@ -69,7 +69,7 @@ NLP to SQL/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/nlp-to-sql-premier-league.git
+git clone https://github.com/Prashanth-Santhanaraman/nlp-to-sql-premier-league.git
 cd nlp-to-sql-premier-league
 ```
 
@@ -96,7 +96,7 @@ GEMINI_API_KEY=your_gemini_api_key
 Download the dataset from Kaggle (see [Dataset Credits](#-dataset-credits) below) and import it into your MySQL database:
 
 ```bash
-mysql -u your_user -p PremierLeague < premier_league.sql
+mysql -u Prashanth-Santhanaraman -p PremierLeague < premier_league.sql
 ```
 
 ### 5. Start the server
